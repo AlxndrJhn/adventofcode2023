@@ -1,0 +1,50 @@
+.......012301230
+.....01234012340
+start_idx = [7,5]
+loop_lengths = [4,5]
+loop_diff=[1,0]
+loop_idx = [0,2]
+max_step = 5
+steps = 7
+steps to solution = 8
+lcm 20
+solution 15
+
+
+
+.......0123012301230
+....0123401234012340
+start_idx=[7,4]
+loop_lengths = [4,5]
+loop_idx = [0,3]
+max_step = 5
+steps = 7
+steps to solution = 12
+lcm 20
+solution = 19 = lcm 
+
+
+.......01230123012301230
+...012340123401234012340
+start_idx=[7,3]
+loop_lengths = [4,5]
+loop_diff=[1,0]
+loop_idx = [0,4]
+max_step = 5
+steps = 7
+steps to solution = 16 = max(loop_idx)/loop_diff
+lcm 20
+solution 23 = lcm +min(start_idx)?
+
+
+.......0123450123450123450
+.....012340123401234012340
+start_idx = [7,5]
+loop_lengths = [6,5]
+loop_idx = [0,2]
+max_step = 6
+steps = 7
+loop_diff=[0,1]
+steps to solution = 6*3 = 18
+lcm loop_lengths 30
+solution 25 = lcm - min(start_idx) ❓
