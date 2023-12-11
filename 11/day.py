@@ -7,6 +7,7 @@ input_data = open(f"{this_folder}/input.txt", "r").read().split("\n")
 
 # Part 1
 EMPTY = "."
+
 # expansion
 matrix = [[x for x in line] for line in input_data]
 WIDTH = len(matrix[0])
@@ -39,6 +40,35 @@ for i, row in enumerate(expanded_matrix):
 _sum = 0
 combinations = list(itertools.combinations(range(len(galaxy_locations)), 2))
 
+for i, j in combinations:
+    x1, y1 = galaxy_locations[i]
+    x2, y2 = galaxy_locations[j]
+    L1_dist = abs(x1 - x2) + abs(y1 - y2)
+    _sum += L1_dist
+print(_sum)
+
+# Part 2
+expanded_matrix = []
+WIDTH += len(empty_cols)
+HEIGHT += len(empty_rows)
+EXPANDED_BY = 1_000_000
+
+galaxy_locations = []
+for i, row in enumerate(matrix):
+    for j, col in enumerate(row):
+        if col == "#":
+            skipped_empty_rows = len([x for x in empty_rows if x < i])
+            skipped_empty_cols = len([x for x in empty_cols if x < j])
+            galaxy_locations.append(
+                (
+                    i + int(skipped_empty_rows * (EXPANDED_BY - 1)),
+                    j + int(skipped_empty_cols * (EXPANDED_BY - 1)),
+                )
+            )
+
+combinations = list(itertools.combinations(range(len(galaxy_locations)), 2))
+
+_sum = 0
 for i, j in combinations:
     x1, y1 = galaxy_locations[i]
     x2, y2 = galaxy_locations[j]
