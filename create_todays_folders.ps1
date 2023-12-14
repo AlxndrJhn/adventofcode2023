@@ -8,3 +8,4 @@ code "$todayAsNum/input2.txt"
 
 # open chrome browser
 start chrome "https://adventofcode.com/2023/day/$todayAsNum"
+start chrome "https://adventofcode.com/2023/day/$todayAsNum/input"
