@@ -22,4 +22,4 @@ def main(filename):
 
 if __name__ == "__main__":
     assert main("input2.txt") == (42, 24)
-    # main("input2.txt")
+    # main("input.txt")
