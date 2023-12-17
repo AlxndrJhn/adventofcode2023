@@ -4,6 +4,7 @@ import math
 import os
 import re
 from collections import defaultdict
+import functools
 
 this_folder = "\\".join(__file__.split("\\")[:-1])
 
@@ -33,7 +34,8 @@ def main(filename):
     start_node = (0, 0)
     end_node = (W - 1, H - 1)
 
-    def get_distance(node1, node2, previous_nodes):
+    @functools.lru_cache(maxsize=None)
+    def get_distance(node1, node2):
         if node1[2] == Dir.DOWN and node2[2] == Dir.UP:
             return float("inf")
         if node1[2] == Dir.UP and node2[2] == Dir.DOWN:
@@ -71,7 +73,7 @@ def main(filename):
     dirs = [Dir.UP, Dir.DOWN, Dir.LEFT, Dir.RIGHT]
 
     # use input_data_mat[x][y] as loss function, find path from START to END using Dijkstra's algorithm
-    unvisited_nodes = list(itertools.product(range(W), range(H), dirs, range(3)))
+    unvisited_nodes = set(itertools.product(range(W), range(H), dirs, range(3)))
     shortest_path = defaultdict(lambda: float("inf"))
     previous_nodes = {}
 
@@ -80,6 +82,8 @@ def main(filename):
     while unvisited_nodes:
         print(len(unvisited_nodes))
         current_min_node = min(unvisited_nodes, key=lambda node: shortest_path[node])
+        if shortest_path[current_min_node] == float("inf"):
+            break
         *node, from_dir, dir_count = current_min_node
         node = tuple(node)
         neighbors = get_neighbors(node)
@@ -90,7 +94,7 @@ def main(filename):
             dir_count_n = dir_count + 1 if dir_to_n == from_dir else 0
             selector = (x_n, y_n, dir_to_n, dir_count_n)
             tentative_value = shortest_path[current_min_node] + get_distance(
-                current_min_node, selector, previous_nodes
+                current_min_node, selector
             )
             if tentative_value < shortest_path[selector]:
                 shortest_path[selector] = tentative_value
@@ -113,4 +117,4 @@ def main(filename):
 
 if __name__ == "__main__":
     assert main("input2.txt") == (102, 24)
-    # main("input.txt")
+    main("input.txt")
