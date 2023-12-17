@@ -8,27 +8,47 @@ from collections import defaultdict
 this_folder = "\\".join(__file__.split("\\")[:-1])
 
 
+class Dir:
+    UP = "^"
+    DOWN = "v"
+    LEFT = "<"
+    RIGHT = ">"
+
+
+diff_to_dir = {
+    (-1, 0): Dir.UP,
+    (1, 0): Dir.DOWN,
+    (0, -1): Dir.LEFT,
+    (0, 1): Dir.RIGHT,
+}
+
+MAX_STRAIGHT = 3
+
+
 def main(filename):
     input_data = open(f"{this_folder}/{filename}", "r").read().split("\n")
     input_data_mat = [[int(char) for char in line] for line in input_data]
     W = len(input_data_mat[0])
     H = len(input_data_mat)
+    start_node = (0, 0)
+    end_node = (W - 1, H - 1)
 
     def get_distance(node1, node2, previous_nodes):
-        last_nodes = [node1]
-        MAX_STRAIGHT = 3
-        for _ in range(MAX_STRAIGHT - 1):
-            if last_nodes[-1] not in previous_nodes:
-                break
-            last_nodes.append(previous_nodes[last_nodes[-1]])
-        distances = (node2[0] - last_nodes[-1][0], node2[1] - last_nodes[-1][1])
-        if abs(distances[0]) == MAX_STRAIGHT or abs(distances[1]) == MAX_STRAIGHT:
+        if node1[2] == Dir.DOWN and node2[2] == Dir.UP:
             return float("inf")
-        diff = (node1[0] - node2[0], node1[1] - node2[1])
-        assert diff[0] <= 1 and diff[1] <= 1
+        if node1[2] == Dir.UP and node2[2] == Dir.DOWN:
+            return float("inf")
+        if node1[2] == Dir.LEFT and node2[2] == Dir.RIGHT:
+            return float("inf")
+        if node1[2] == Dir.RIGHT and node2[2] == Dir.LEFT:
+            return float("inf")
+
+        if node2[3] == MAX_STRAIGHT:
+            return float("inf")
+
         return input_data_mat[node2[0]][node2[1]]
 
-    def get_neighbors(node, previous_nodes):
+    def get_neighbors(node):
         x, y = node
 
         neighbors = []
@@ -47,48 +67,42 @@ def main(filename):
         return neighbors
 
     # Part 1
-    start_node = (0, 0)
-    end_node = (W - 1, H - 1)
+    # list of Dirs
+    dirs = [Dir.UP, Dir.DOWN, Dir.LEFT, Dir.RIGHT]
+
     # use input_data_mat[x][y] as loss function, find path from START to END using Dijkstra's algorithm
-    unvisited_nodes = list(itertools.product(range(W), range(H)))
-    shortest_path = {}
+    unvisited_nodes = list(itertools.product(range(W), range(H), dirs, range(3)))
+    shortest_path = defaultdict(lambda: float("inf"))
     previous_nodes = {}
 
-    for node in unvisited_nodes:
-        shortest_path[node] = float("inf")
-    shortest_path[start_node] = 0
+    shortest_path[start_node[0], start_node[1], Dir.RIGHT, 1] = 0
 
     while unvisited_nodes:
-        current_min_node = None
-        for node in unvisited_nodes:  # Iterate over the nodes
-            if current_min_node is None:
-                current_min_node = node
-            elif shortest_path[node] < shortest_path[current_min_node]:
-                current_min_node = node
-
-        neighbors = get_neighbors(current_min_node, previous_nodes)
+        print(len(unvisited_nodes))
+        current_min_node = min(unvisited_nodes, key=lambda node: shortest_path[node])
+        *node, from_dir, dir_count = current_min_node
+        node = tuple(node)
+        neighbors = get_neighbors(node)
         for neighbor in neighbors:
+            x_n, y_n = neighbor
+            diff = (x_n - node[0], y_n - node[1])
+            dir_to_n = diff_to_dir[diff]
+            dir_count_n = dir_count + 1 if dir_to_n == from_dir else 0
+            selector = (x_n, y_n, dir_to_n, dir_count_n)
             tentative_value = shortest_path[current_min_node] + get_distance(
-                current_min_node, neighbor, previous_nodes
+                current_min_node, selector, previous_nodes
             )
-            if tentative_value < shortest_path[neighbor]:
-                shortest_path[neighbor] = tentative_value
-                previous_nodes[neighbor] = current_min_node
+            if tentative_value < shortest_path[selector]:
+                shortest_path[selector] = tentative_value
+                previous_nodes[selector] = current_min_node
 
         unvisited_nodes.remove(current_min_node)
-    # resolve path from start to end with previous_nodes
-    path = [end_node]
-    while path[0] != start_node:
-        path = [previous_nodes[path[0]]] + path
 
-    # path = shortest_path_nodes[end_node]
-    path_value = shortest_path[end_node]
-    copy = deepcopy(input_data_mat)
-    for node in path:
-        copy[node[0]][node[1]] = "X"
-    for line in copy:
-        print("".join([str(x) for x in line]))
-    result1 = path_value
+    all_end_nodes = [node for node in shortest_path if node[:2] == end_node]
+    all_costs = [shortest_path[node] for node in all_end_nodes]
+    lowest_cost = min(all_costs)
+
+    result1 = lowest_cost
     print(f"Part 1 {filename}: ", result1)
 
     # Part 2
