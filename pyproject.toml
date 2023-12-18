@@ -8,6 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 tqdm = "^4.66.1"
+matplotlib = "^3.8.2"
 
 
 [tool.poetry.group.dev.dependencies]
