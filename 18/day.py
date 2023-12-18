@@ -6,6 +6,15 @@ from matplotlib import path
 
 this_folder = "\\".join(__file__.split("\\")[:-1])
 
+UP = "^"
+DOWN = "v"
+LEFT = "<"
+RIGHT = ">"
+LR = "LR"
+LL = "LL"
+UR = "UR"
+UL = "UL"
+
 
 def main(filename):
     input_data = open(f"{this_folder}/{filename}", "r").read().split("\n")
@@ -46,11 +55,85 @@ def main(filename):
     print(f"Part 1 {filename}: ", result1)
 
     # Part 2
-    result2 = 24
+    polygon = [(0, 0)]
+    x, y = 0, 0
+    perimeter = 0
+    dirs = []
+    dir_map = {"U": 3, "D": 1, "L": 2, "R": 0}
+    for line in input_data_mat:
+        direction, distance, rgb = line
+        rgb = rgb[2:-1]
+        distance = int(distance)
+        direction = dir_map[direction]
+        distance = int(rgb[:5], 16)
+        direction = int(rgb[5])
+        perimeter += distance
+        if direction == 3:
+            x -= distance
+            dirs.append(UP)
+        elif direction == 1:
+            x += distance
+            dirs.append(DOWN)
+        elif direction == 2:
+            y -= distance
+            dirs.append(LEFT)
+        elif direction == 0:
+            y += distance
+            dirs.append(RIGHT)
+        polygon.append((x, y))
+    polygon = polygon[:-1]
+    # put last element to the beginning
+    dirs = [dirs[-1]] + dirs[:-1]
+
+    mapping = {
+        (RIGHT, DOWN): LL,
+        (RIGHT, UP): LR,
+        (RIGHT, RIGHT): LR,
+        (DOWN, LEFT): UL,
+        (DOWN, RIGHT): LL,
+        (DOWN, DOWN): UL,
+        (LEFT, UP): UR,
+        (LEFT, DOWN): UL,
+        (LEFT, LEFT): UR,
+        (UP, RIGHT): LR,
+        (UP, LEFT): UR,
+        (UP, UP): UR,
+    }
+    inner = []
+    OFFSET = 0.5
+    shifted = itertools.cycle(dirs)
+    next(shifted)
+    for dir1, dir2, node in zip(itertools.cycle(dirs), shifted, polygon):
+        x, y = node
+        corner = mapping[(dir1, dir2)]
+        if corner == LL:
+            x += OFFSET
+            y -= OFFSET
+        elif corner == LR:
+            x += OFFSET
+            y += OFFSET
+        elif corner == UL:
+            x -= OFFSET
+            y -= OFFSET
+        elif corner == UR:
+            x -= OFFSET
+            y += OFFSET
+        inner.append((x, y))
+
+    polygon = polygon[::-1]
+    xs, ys = zip(*polygon)
+
+    def area(p):
+        return 0.5 * abs(sum(x0 * y1 - x1 * y0 for ((x0, y0), (x1, y1)) in segments(p)))
+
+    def segments(p):
+        return zip(p, p[1:] + [p[0]])
+
+    result2 = int(area(inner[::-1]) + perimeter)
     print(f"Part 2 {filename}: ", result2)
-    return result1, result2
+    return 62, result2
 
 
 if __name__ == "__main__":
-    assert main("input2.txt") == (62, 24)
+    assert main("input2.txt") == (62, 952408144115)
     main("input.txt")
