@@ -1,3 +1,4 @@
+from copy import deepcopy
 import itertools
 import os
 import re
@@ -76,7 +77,71 @@ def main(filename):
     print(f"Part 1 {filename}: ", result1)
 
     # Part 2
-    result2 = 24
+    def get_default_interval():
+        # including start, excluding endw
+        return (1, 4000 + 1)
+
+    # workflow, x, m, a, s
+    interval_queue = [
+        (
+            "in",
+            get_default_interval(),
+            get_default_interval(),
+            get_default_interval(),
+            get_default_interval(),
+            [None],
+        ),
+    ]
+    combis = 0
+    name_to_interval = {
+        "x": 0,
+        "m": 1,
+        "a": 2,
+        "s": 3,
+    }
+    while interval_queue:
+        wf_name, *intervals, path = interval_queue.pop(0)
+        path = path + [wf_name]
+        for lower, upper in intervals:
+            span = upper - lower
+            assert span > 1
+        if wf_name == REJECT:
+            continue
+        if wf_name == ACCEPT:
+            product = 1
+            for lower, upper in intervals:
+                product *= upper - lower
+            combis += product
+            continue
+        workflow = workflows[wf_name]
+        for condition in workflow["conditions"]:
+            idx_interval = name_to_interval[condition["var"]]
+            interval_to_check = intervals[idx_interval]
+            if condition["op"] == GT:
+                if interval_to_check[1] - 1 > condition["val"]:
+                    copied_intervals = deepcopy(intervals)
+                    new_interval1 = (condition["val"] + 1, interval_to_check[1])
+                    copied_intervals[idx_interval] = new_interval1
+                    interval_queue.append((condition["next"], *copied_intervals, path))
+
+                    new_interval2 = (interval_to_check[0], condition["val"] + 1)
+                    intervals[idx_interval] = new_interval2
+            elif condition["op"] == LT:
+                if interval_to_check[0] < condition["val"]:
+                    copied_intervals = deepcopy(intervals)
+                    new_interval1 = (interval_to_check[0], condition["val"])
+                    copied_intervals[idx_interval] = new_interval1
+                    interval_queue.append((condition["next"], *copied_intervals, path))
+
+                    new_interval2 = (condition["val"], interval_to_check[1])
+                    intervals[idx_interval] = new_interval2
+
+            else:
+                raise Exception(f"Unknown operator {condition['op']}")
+        copied_intervals = deepcopy(intervals)
+        interval_queue.append((workflow["default"], *copied_intervals, path))
+
+    result2 = combis
     print(f"Part 2 {filename}: ", result2)
     return result1, result2
 
