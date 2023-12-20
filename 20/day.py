@@ -110,6 +110,10 @@ def main(filename):
                 point_set.add(name)
         point_set = point_set - ignored
         cluster_point_sets.append(tuple(point_set))
+
+    all_points = set(name for name in components.keys() if name not in ignored)
+    missing_points = all_points - set.union(*[set(c) for c in cluster_point_sets])
+    assert len(missing_points) == 0
     # reset components
     counter = {"low": 0, "high": 0}
     for name, component in components.items():
@@ -121,7 +125,7 @@ def main(filename):
             component["input_states"] = ["low"] * len(component["inputs"])
         else:
             raise ValueError(f"Unknown component type: {name}")
-    hashes_per_cluster = defaultdict(set)
+    hashes_per_cluster = defaultdict(list)
     time_to_first_repeat = {}
     iterations = 0
     cycle_length = {k: None for k in cluster_point_sets}
@@ -134,31 +138,40 @@ def main(filename):
                 if cluster not in time_to_first_repeat:
                     time_to_first_repeat[cluster] = iterations
                 else:
-                    diff = iterations - time_to_first_repeat[cluster]
+                    # get last index of state_hash
+                    idx_last_encounter = [
+                        i
+                        for i, hash_ in enumerate(hashes_per_cluster[cluster])
+                        if hash_ == state_hash
+                    ][-1]
+                    current_length = len(hashes_per_cluster[cluster])
+                    diff = current_length - idx_last_encounter
                     if diff > 10:
                         cycle_length[cluster] = diff
                     time_to_first_repeat[cluster] = iterations
-                    hashes_per_cluster[cluster] = set()
+                    hashes_per_cluster[cluster] = []
                     print(f"{diff} iters for {cluster}")
             else:
-                hashes_per_cluster[cluster].add(state_hash)
+                hashes_per_cluster[cluster].append(state_hash)
         if all(cycle_length.values()):
             break
         iterations += 1
 
-    max_value = math.lcm(*cycle_length.values()) + iterations
+    max_value = math.lcm(*cycle_length.values())
     result2 = max_value
     print(f"Part 2 {filename}: ", result2)
     return result1, result2
 
 
 def get_hash_for_state_of_cluster(components, cluster):
-    cluster_flipflop_states = []
+    cluster_states = []
     for name in cluster:
         component = components[name]
         if component["type"] == "flip-flop":
-            cluster_flipflop_states.append(component["state"])
-    state_hash = hash(tuple(cluster_flipflop_states))
+            cluster_states.append(component["state"])
+        elif component["type"] == "conjunction":
+            cluster_states.extend(component["input_states"])
+    state_hash = hash(tuple(cluster_states))
     return state_hash
 
 
