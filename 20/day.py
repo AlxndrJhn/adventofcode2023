@@ -1,4 +1,5 @@
 import itertools
+import math
 import os
 import re
 from collections import defaultdict
@@ -67,6 +68,48 @@ def main(filename):
     if rx_name not in components:
         return result1, None
 
+    # get clusters, that start at broadcaster and end at rx
+    paths_to_rz = []
+    queue = [("broadcaster", [])]
+    while queue:
+        name, path = queue.pop(0)
+        path = path + [name]
+        component = components[name]
+        if name == rx_name:
+            if any(components[name]["type"] == "flip-flop" for name in path):
+                paths_to_rz.append(tuple(path))
+            continue
+        if component["type"] == "output":
+            continue
+        for connected_to_name in component["connected_to"]:
+            if connected_to_name in path:
+                # cycle
+                continue
+            queue.append((connected_to_name, path))
+    clusters = []
+    # get all other parts that share at least one component that is not rz and not broadcaster
+    temp_cluster = [paths_to_rz[0]]
+    assigned = set()
+    ignored = set([rx_name, "broadcaster", "dn"])
+    for path in paths_to_rz:
+        if path in assigned:
+            continue
+        for other_path in paths_to_rz:
+            if path == other_path:
+                continue
+            if any(name in other_path for name in path if name not in ignored):
+                temp_cluster.append(other_path)
+                assigned.add(other_path)
+        clusters.append(temp_cluster)
+        temp_cluster = []
+    cluster_point_sets = []
+    for cluster in clusters:
+        point_set = set()
+        for path in cluster:
+            for name in path:
+                point_set.add(name)
+        point_set = point_set - ignored
+        cluster_point_sets.append(tuple(point_set))
     # reset components
     counter = {"low": 0, "high": 0}
     for name, component in components.items():
@@ -78,9 +121,45 @@ def main(filename):
             component["input_states"] = ["low"] * len(component["inputs"])
         else:
             raise ValueError(f"Unknown component type: {name}")
-    result2 = 24
+    hashes_per_cluster = defaultdict(set)
+    time_to_first_repeat = {}
+    iterations = 0
+    cycle_length = {k: None for k in cluster_point_sets}
+    while True:
+        execute_all_pulses(components, counter)
+        # get all flip flop states in all clusters
+        for cluster in cluster_point_sets:
+            state_hash = get_hash_for_state_of_cluster(components, cluster)
+            if state_hash in hashes_per_cluster[cluster]:
+                if cluster not in time_to_first_repeat:
+                    time_to_first_repeat[cluster] = iterations
+                else:
+                    diff = iterations - time_to_first_repeat[cluster]
+                    if diff > 10:
+                        cycle_length[cluster] = diff
+                    time_to_first_repeat[cluster] = iterations
+                    hashes_per_cluster[cluster] = set()
+                    print(f"{diff} iters for {cluster}")
+            else:
+                hashes_per_cluster[cluster].add(state_hash)
+        if all(cycle_length.values()):
+            break
+        iterations += 1
+
+    max_value = math.lcm(*cycle_length.values()) + iterations
+    result2 = max_value
     print(f"Part 2 {filename}: ", result2)
     return result1, result2
+
+
+def get_hash_for_state_of_cluster(components, cluster):
+    cluster_flipflop_states = []
+    for name in cluster:
+        component = components[name]
+        if component["type"] == "flip-flop":
+            cluster_flipflop_states.append(component["state"])
+    state_hash = hash(tuple(cluster_flipflop_states))
+    return state_hash
 
 
 def execute_all_pulses(components, counter):
