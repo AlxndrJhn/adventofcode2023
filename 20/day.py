@@ -67,53 +67,10 @@ def main(filename):
     rx_name = "rx"
     if rx_name not in components:
         return result1, None
+    # get all components that are connected to dn
+    assert rx_name in components["dn"]["connected_to"]
+    important_points = [components[name] for name in components["dn"]["inputs"]]
 
-    # get clusters, that start at broadcaster and end at rx
-    paths_to_rz = []
-    queue = [("broadcaster", [])]
-    while queue:
-        name, path = queue.pop(0)
-        path = path + [name]
-        component = components[name]
-        if name == rx_name:
-            if any(components[name]["type"] == "flip-flop" for name in path):
-                paths_to_rz.append(tuple(path))
-            continue
-        if component["type"] == "output":
-            continue
-        for connected_to_name in component["connected_to"]:
-            if connected_to_name in path:
-                # cycle
-                continue
-            queue.append((connected_to_name, path))
-    clusters = []
-    # get all other parts that share at least one component that is not rz and not broadcaster
-    temp_cluster = [paths_to_rz[0]]
-    assigned = set()
-    ignored = set([rx_name, "broadcaster", "dn"])
-    for path in paths_to_rz:
-        if path in assigned:
-            continue
-        for other_path in paths_to_rz:
-            if path == other_path:
-                continue
-            if any(name in other_path for name in path if name not in ignored):
-                temp_cluster.append(other_path)
-                assigned.add(other_path)
-        clusters.append(temp_cluster)
-        temp_cluster = []
-    cluster_point_sets = []
-    for cluster in clusters:
-        point_set = set()
-        for path in cluster:
-            for name in path:
-                point_set.add(name)
-        point_set = point_set - ignored
-        cluster_point_sets.append(tuple(point_set))
-
-    all_points = set(name for name in components.keys() if name not in ignored)
-    missing_points = all_points - set.union(*[set(c) for c in cluster_point_sets])
-    assert len(missing_points) == 0
     # reset components
     counter = {"low": 0, "high": 0}
     for name, component in components.items():
@@ -125,39 +82,28 @@ def main(filename):
             component["input_states"] = ["low"] * len(component["inputs"])
         else:
             raise ValueError(f"Unknown component type: {name}")
-    hashes_per_cluster = defaultdict(list)
-    time_to_first_repeat = {}
+
+    # get cycle length
     iterations = 0
-    cycle_length = {k: None for k in cluster_point_sets}
+    cycle_length = {c["name"]: None for c in important_points}
+    pulse_collector = {
+        "dn": {k["name"]: {"low": 0, "high": 0} for k in important_points}
+    }
     while True:
-        execute_all_pulses(components, counter)
-        # get all flip flop states in all clusters
-        for cluster in cluster_point_sets:
-            state_hash = get_hash_for_state_of_cluster(components, cluster)
-            if state_hash in hashes_per_cluster[cluster]:
-                if cluster not in time_to_first_repeat:
-                    time_to_first_repeat[cluster] = iterations
-                else:
-                    # get last index of state_hash
-                    idx_last_encounter = [
-                        i
-                        for i, hash_ in enumerate(hashes_per_cluster[cluster])
-                        if hash_ == state_hash
-                    ][-1]
-                    current_length = len(hashes_per_cluster[cluster])
-                    diff = current_length - idx_last_encounter
-                    if diff > 10:
-                        cycle_length[cluster] = diff
-                    time_to_first_repeat[cluster] = iterations
-                    hashes_per_cluster[cluster] = []
-                    print(f"{diff} iters for {cluster}")
-            else:
-                hashes_per_cluster[cluster].append(state_hash)
+        execute_all_pulses(components, counter, pulse_collector)
+        for i, component in enumerate(important_points):
+            name = component["name"]
+            if (
+                pulse_collector["dn"][name]["high"] >= 1
+                and cycle_length[name] is None
+                and iterations > 10
+            ):
+                cycle_length[name] = iterations
         if all(cycle_length.values()):
             break
         iterations += 1
 
-    max_value = math.lcm(*cycle_length.values())
+    max_value = math.lcm(*[leng + 1 for leng in cycle_length.values()])
     result2 = max_value
     print(f"Part 2 {filename}: ", result2)
     return result1, result2
@@ -175,13 +121,15 @@ def get_hash_for_state_of_cluster(components, cluster):
     return state_hash
 
 
-def execute_all_pulses(components, counter):
+def execute_all_pulses(components, counter, pulse_collector=None):
     queue = [("broadcaster", "low", "button")]
     while queue:
         name, pulse, _from = queue.pop(0)
         # print(f"{_from} -{pulse}-> {name}")
         counter[pulse] += 1
         component = components[name]
+        if pulse_collector and name in pulse_collector:
+            pulse_collector[name][_from][pulse] += 1
         _type = component["type"]
         if _type == "output":
             continue
