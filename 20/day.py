@@ -36,19 +36,18 @@ def main(filename):
             }
         else:
             raise ValueError(f"Unknown component type: {name}")
-    inputs_to_conjunction = defaultdict(list)
+    for name, component in components.items():
+        component["name"] = name
+    node_to_inputs = defaultdict(list)
     for name, component in components.items():
         if component["type"] == "output":
             continue
         for connected_to_name in component["connected_to"]:
-            if components[connected_to_name]["type"] == "conjunction":
-                inputs_to_conjunction[connected_to_name].append(name)
+            node_to_inputs[connected_to_name].append(name)
     for name, component in components.items():
-        if component["type"] == "output":
-            continue
+        component["inputs"] = node_to_inputs[name]
         if component["type"] == "conjunction":
-            component["inputs"] = inputs_to_conjunction[name]
-            component["input_states"] = ["low"] * len(inputs_to_conjunction[name])
+            component["input_states"] = ["low"] * len(node_to_inputs[name])
 
     PUSHES = 1000
     counter = {"low": 0, "high": 0}
@@ -64,14 +63,9 @@ def main(filename):
     print(f"Part 1 {filename}: ", result1)
 
     # Part 2
-    output_name = "rx"
-    if output_name not in components:
+    rx_name = "rx"
+    if rx_name not in components:
         return result1, None
-
-    node_to_rx = next(
-        node for name, node in components.items() if output_name in node["connected_to"]
-    )
-    nodes_to_watch = node_to_rx["inputs"]
 
     # reset components
     counter = {"low": 0, "high": 0}
@@ -84,30 +78,6 @@ def main(filename):
             component["input_states"] = ["low"] * len(component["inputs"])
         else:
             raise ValueError(f"Unknown component type: {name}")
-
-    was_high_at_iter = [None] * len(nodes_to_watch)
-    iter_count = 0
-    while True:
-        execute_all_pulses(components, counter)
-        for i in range(len(nodes_to_watch)):
-            node_name = nodes_to_watch[i]
-            component = components[node_name]
-            all_memories_high = all(
-                state == "high" for state in component["input_states"]
-            )
-            if all_memories_high:
-                if was_high_at_iter[i] is None:
-                    was_high_at_iter[i] = iter_count
-                else:
-                    diff = iter_count - was_high_at_iter[i]
-                    was_high_at_iter[i] = iter_count
-                    print(f"Loop for {node_name}: {diff}")
-                # if all(was_high_at_iter):
-                #     print(f"this iteration: {iter_count}")
-                # break
-        # if all(was_high_at_iter):
-        #     break
-        iter_count += 1
     result2 = 24
     print(f"Part 2 {filename}: ", result2)
     return result1, result2
