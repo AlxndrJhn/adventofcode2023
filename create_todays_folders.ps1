@@ -1,4 +1,12 @@
-$todayAsNum = (Get-Date).ToString("dd")
+# if the first argument is a number, use that as the day number, with leading 0
+# otherwise, use today's date
+if ($args[0] -match "^\d+$") {
+    $todayAsNum = $args[0].ToString().PadLeft(2, '0')
+}
+else {
+    $todayAsNum = (Get-Date).ToString("dd")
+}
+
 # copy template to new folder
 cp -r template "$todayAsNum"
 code "$todayAsNum/day.py"

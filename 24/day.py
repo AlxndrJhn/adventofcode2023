@@ -52,6 +52,12 @@ def main(filename, _min, _max):
     print(f"Part 1 {filename}: ", result1)
 
     # Part 2
+    # p_1 + t_1 * v_1 = p_T + t_1 * v_T
+    # p_2 + t_2 * v_2 = p_T + t_2 * v_T
+    # ...
+    # p_n + t_n * v_n = p_T + t_n * v_T
+    # resolve this system of linear equations for p_T, v_T and t_1, t_2, ..., t_n
+
     result2 = 24
     print(f"Part 2 {filename}: ", result2)
     return result1, result2
