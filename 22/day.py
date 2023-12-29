@@ -67,7 +67,25 @@ def main(filename):
     print(f"Part 1 {filename}: ", result1)
 
     # Part 2
-    result2 = 24
+    affected_bricks = 0
+    for name in name_to_coords.keys():
+        if len(bricks_above[name]) == 0:
+            continue
+        count_affected = 0
+        bricks_to_check = set(bricks_above[name])
+        bricks_that_fall = set(name)
+        while bricks_to_check:
+            brick = bricks_to_check.pop()
+            below_bricks_that_do_not_fall = (
+                bricks_below[brick] - bricks_that_fall - {name}
+            )
+            has_two_or_more_below = len(below_bricks_that_do_not_fall) >= 1
+            if not has_two_or_more_below:
+                count_affected += 1
+                bricks_that_fall.add(brick)
+                bricks_to_check.update(bricks_above[brick])
+        affected_bricks += count_affected
+    result2 = affected_bricks
     print(f"Part 2 {filename}: ", result2)
     return result1, result2
 
@@ -141,5 +159,5 @@ def get_brick_graph(name_to_brick_coords):
 
 
 if __name__ == "__main__":
-    assert main("input2.txt") == (5, 24)
+    assert main("input2.txt") == (5, 7)
     main("input.txt")
