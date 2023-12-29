@@ -1,3 +1,4 @@
+from functools import lru_cache
 import itertools
 import os
 import re
@@ -15,65 +16,54 @@ def main(filename):
         tuple([tuple(int(i) for i in coord.split(",")) for coord in line])
         for line in input_data_parts
     ]
-    grid = defaultdict(int)
-    set_occupied(brick_coords, grid)
 
-    # Part 1
+    def num_to_alpha(num):
+        return chr(ord("A") + num)
+
+    name_to_coords = {num_to_alpha(i): coord for i, coord in enumerate(brick_coords)}
+    coords_to_name = defaultdict(lambda: None)
+    for name, brick in name_to_coords.items():
+        set_links_to_brick(coords_to_name, name, brick)
     while True:
         something_changed = False
-        for i in range(len(brick_coords)):
-            brick = brick_coords[i]
-            start, end = brick
-            all_free = is_free_underneath(start, end, grid)
-            if all_free:
-                # print(f"Removing {start} {end}")
+        for name, brick in name_to_coords.items():
+            lowest_z = min(brick, key=lambda x: x[2])[2]
+            if lowest_z == 1:
+                continue
+            is_blocked = False
+            for z in range(lowest_z - 1, 0, -1):
+                for x, y in get_xy_generator(brick):
+                    if coords_to_name[(x, y, z)] is not None:
+                        new_z = z + 1
+                        is_blocked = True
+                        break
+                if is_blocked:
+                    break
+            else:
+                new_z = 1
+            if new_z != lowest_z:
+                remove_links_to_brick(coords_to_name, name, brick)
+                lower_brick = move_down(brick, lowest_z - new_z)
+                name_to_coords[name] = lower_brick
+                set_links_to_brick(coords_to_name, name, lower_brick)
                 something_changed = True
-                remove_brick(grid, start, end)
-                new_start = (start[0], start[1], start[2] - 1)
-                new_end = (end[0], end[1], end[2] - 1)
-                # print(f"Adding {new_start} {new_end}")
-                brick_coords[i] = (new_start, new_end)
-                set_occupied([brick], grid)
         if not something_changed:
             break
-
-    grid_per_brick = {}
-    for brick in brick_coords:
-        start, end = brick
-        grid_per_brick[brick] = defaultdict(int)
-        for x in range(start[0], end[0] + 1):
-            for y in range(start[1], end[1] + 1):
-                for z in range(start[2], end[2] + 1):
-                    grid_per_brick[brick][(x, y, z)] = 1
-
-    bricks_above = defaultdict(set)
-    bricks_below = defaultdict(set)
-    for brick1 in brick_coords:
-        start, end = brick1
-        max_z = max(start[2], end[2])
-        for x in range(start[0], end[0] + 1):
-            for y in range(start[1], end[1] + 1):
-                check_coords = (x, y, max_z + 1)
-                for brick2 in brick_coords:
-                    if brick1 == brick2:
-                        continue
-                    if grid_per_brick[brick2][check_coords] == 1:
-                        bricks_above[brick1].add(brick2)
-                        bricks_below[brick2].add(brick1)
-
-    do_not_support_anything = set()
-    for brick in brick_coords:
-        if len(bricks_above[brick]) == 0:
-            do_not_support_anything.add(brick)
-        else:
-            all_are_supported_by_two = True
-            for brick2 in bricks_above[brick]:
-                if len(bricks_below[brick2]) == 1:
-                    all_are_supported_by_two = False
-                    break
-            if all_are_supported_by_two:
-                do_not_support_anything.add(brick)
-    result1 = len(do_not_support_anything)
+    # check supporting
+    bricks_above, bricks_below = get_brick_graph(name_to_coords)
+    bricks_that_are_optional = set()
+    for name in name_to_coords.keys():
+        if len(bricks_above[name]) == 0:
+            bricks_that_are_optional.add(name)
+            continue
+        all_above_have_two_below = True
+        for above_name in bricks_above[name]:
+            if len(bricks_below[above_name]) == 1:
+                all_above_have_two_below = False
+                break
+        if all_above_have_two_below:
+            bricks_that_are_optional.add(name)
+    result1 = len(bricks_that_are_optional)
     print(f"Part 1 {filename}: ", result1)
 
     # Part 2
@@ -82,39 +72,72 @@ def main(filename):
     return result1, result2
 
 
-def remove_brick(grid, start, end):
-    for x in range(start[0], end[0] + 1):
-        for y in range(start[1], end[1] + 1):
-            for z in range(start[2], end[2] + 1):
-                grid[(x, y, z)] = 0
+def move_down(brick, z_diff):
+    return (
+        (brick[0][0], brick[0][1], brick[0][2] - z_diff),
+        (brick[1][0], brick[1][1], brick[1][2] - z_diff),
+    )
 
 
-def set_occupied(brick_coords, grid):
-    for start, end in brick_coords:
-        for x in range(start[0], end[0] + 1):
-            for y in range(start[1], end[1] + 1):
-                for z in range(start[2], end[2] + 1):
-                    grid[(x, y, z)] = 1
+def set_links_to_brick(coords_to_name, name, brick):
+    # print("set_links_to_brick", name, brick)
+    for x, y, z in get_xyz_points(brick):
+        assert coords_to_name[(x, y, z)] is None
+        coords_to_name[(x, y, z)] = name
 
 
-def is_free_underneath(start, end, grid):
-    lowest_z = min(start[2], end[2])
-    if lowest_z == 1:
-        return False
-    for x in range(start[0], end[0] + 1):
-        for y in range(start[1], end[1] + 1):
-            if grid[(x, y, lowest_z - 1)] == 1:
-                return False
-    return True
+def remove_links_to_brick(coords_to_name, name, brick):
+    # print("remove_links_to_brick", name, brick)
+    pass
+    for x, y, z in get_xyz_points(brick):
+        assert (
+            coords_to_name[(x, y, z)] == name
+        ), f"{coords_to_name[(x, y, z)]} is {name}"
+        coords_to_name[(x, y, z)] = None
 
 
-def could_be_removed(start, end, grid):
-    highest = max(start[2], end[2])
-    for x in range(start[0], end[0] + 1):
-        for y in range(start[1], end[1] + 1):
-            if grid[(x, y, highest + 1)] == 1:
-                return False
-    return True
+def get_xyz_points(coords):
+    return set(
+        itertools.product(
+            range(coords[0][0], coords[1][0] + 1),
+            range(coords[0][1], coords[1][1] + 1),
+            range(coords[0][2], coords[1][2] + 1),
+        )
+    )
+
+
+def get_xy_generator(coords):
+    return set(
+        itertools.product(
+            range(coords[0][0], coords[1][0] + 1),
+            range(coords[0][1], coords[1][1] + 1),
+        )
+    )
+
+
+def get_brick_graph(name_to_brick_coords):
+    bricks_above = defaultdict(set)
+    bricks_below = defaultdict(set)
+    for name1, brick1 in name_to_brick_coords.items():
+        for name2, brick2 in name_to_brick_coords.items():
+            if name1 == name2:
+                continue
+            brick2_points = get_xyz_points(brick2)
+            # check if brick2 is supporting brick1
+            coord_brick1_with_lowest_z = min(brick1, key=lambda x: x[2])[2]
+            coord_brick1_with_higher_z = max(brick1, key=lambda x: x[2])[2]
+            if coord_brick1_with_lowest_z - 1 == 0:  # is on the ground
+                bricks_below[name1].add(None)
+            for x, y in get_xy_generator(brick1):
+                if (x, y, coord_brick1_with_lowest_z - 1) in brick2_points:
+                    bricks_below[name1].add(name2)
+                    bricks_above[name2].add(name1)
+                    break
+                if (x, y, coord_brick1_with_higher_z + 1) in brick2_points:
+                    bricks_below[name2].add(name1)
+                    bricks_above[name1].add(name2)
+                    break
+    return bricks_above, bricks_below
 
 
 if __name__ == "__main__":
